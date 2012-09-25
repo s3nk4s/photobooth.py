@@ -2,6 +2,7 @@
 # photobooth.py - version 0.3
 # Requires: python-imaging, qrencode, gphoto2, surl
 # Author: Luke Macken <lmacken@redhat.com>
+# http://lewk.org/blog/photobooth.py
 # License: GPLv3
 
 import os
@@ -13,22 +14,22 @@ from uuid import uuid4
 from os.path import join, basename, expanduser
 
 # Where to spit out our qrcode, watermarked image, and local html
-out = expanduser('~/Desktop/sxsw')
+out = os.getcwd() + "/pics"
 
 # The watermark to apply to all images
 watermark_img = expanduser('~/Desktop/fedora.png')
 
 # This assumes ssh-agent is running so we can do password-less scp
-ssh_image_repo = 'fedorapeople.org:~/public_html/sxsw/'
+ssh_image_repo = '<full scp connection eg user@server:/var/www/pics>'
 
 # The public HTTP repository for uploaded images
-http_image_repo = 'http://lmacken.fedorapeople.org/sxsw/'
+http_image_repo = '<url to pics, eg, http://server.com/pics>'
 
 # Size of the qrcode pixels
 qrcode_size = 10
 
 # Whether or not to delete the photo after uploading it to the remote server
-delete_after_upload = True
+delete_after_upload = False
 
 # The camera configuration
 # Use gphoto2 --list-config and --get-config for more information
@@ -51,6 +52,7 @@ class PhotoBooth(object):
 
     def capture_photo(self):
         """ Capture a photo and download it from the camera """
+
         filename = join(out, '%s.jpg' % str(uuid4()))
         cfg = ['--set-config=%s=%s' % (k, v) for k, v in gphoto_config.items()]
         subprocess.call('gphoto2 ' +
@@ -61,16 +63,18 @@ class PhotoBooth(object):
 
     def process_image(self, filename):
         print "Processing %s..." % filename
-        print "Applying watermark..."
-        image = self.watermark(filename)
+        """ print "Applying watermark..." """
+        """ image = self.watermark(filename) """ """ commented out and below, image = filename to save multiple renames further down """
+	image = filename
         print "Uploading to remote server..."
+	print image
         url = self.upload(image)
         print "Generating QRCode..."
         qrcode = self.qrencode(url)
         print "Shortening URL..."
         tiny = self.shorten(url)
         print "Generating HTML..."
-        html = self.html_output(url, qrcode, tiny)
+        html = self.html_output(filename, qrcode, tiny)
         subprocess.call('xdg-open "%s"' % html, shell=True)
         print "Done!"
 
@@ -89,6 +93,7 @@ class PhotoBooth(object):
 
     def upload(self, image):
         """ Upload this image to a remote server """
+	print 'scp "%s" %s' % (image, ssh_image_repo)
         subprocess.call('scp "%s" %s' % (image, ssh_image_repo), shell=True)
         if delete_after_upload:
             os.unlink(image)
@@ -117,7 +122,7 @@ class PhotoBooth(object):
                     </td>
                   </tr>
                   <tr>
-                    <td><img src="%(image)s" border="0"/></td>
+                    <td><img src="%(image)s" border="0" height="20%%" width="20%%"/></td>
                     <td><img src="%(qrcode)s" border="0"/></td>
                   </tr>
                 </table>
